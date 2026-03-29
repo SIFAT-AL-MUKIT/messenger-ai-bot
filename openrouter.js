@@ -10,7 +10,7 @@ const FALLBACK_MODEL = "openrouter/free"; // OpenRouter এর অটো-রা�
 
 const SYSTEM_PROMPT = {
     role: "system",
-    content: "You are a helpful assistant talking via Facebook Messenger. DO NOT use any markdown formatting like **, *, #, or `.` Use pure plain text only. Use spacing and line breaks to make text readable. Keep your answers concise and answer in Bengali mostly."
+    content: "You are a helpful assistant created by Sifat. You are integrated to Messenger. Always response in plain text. Don't response in markdown formate. Keep it mind that messenger can't render markdown or Latex."
 };
 
 // senderId যুক্ত করা হলো যাতে এরর হলে মেসেঞ্জারে সরাসরি অ্যালার্ট পাঠানো যায়

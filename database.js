@@ -1,74 +1,157 @@
 const mongoose = require('mongoose');
 
-// ডাটাবেসের ছাঁচ (Schema)
+const MAX_MESSAGES = 30;
+
 const chatSchema = new mongoose.Schema({
-    senderId: { type: String, required: true, unique: true },
-    messages:[
+    senderId: { type: String, required: true, unique: true, index: true },
+    preferredProvider: { type: String, default: 'google' },  // ★ নতুন
+    preferredModel: { type: String, default: null },
+    messages: [
         {
             role: { type: String, required: true },
-            content: { type: String, required: true }
+            content: { type: String, required: true },
+            createdAt: { type: Date, default: Date.now }
         }
-    ]
+    ],
+    updatedAt: { type: Date, default: Date.now }
 });
 
 const Chat = mongoose.model('Chat', chatSchema);
 
-// MongoDB কানেকশন
+let isConnected = false;
+
 async function connectDB() {
     try {
-        if (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('ekhane_mongodb_url_bosbe')) {
-            console.log('⚠️ MongoDB URI সেট করা নেই। মেমরি সেভ হবে না, তবে চ্যাটবট কাজ করবে।');
+        if (!process.env.MONGODB_URI) {
+            console.log('⚠️ MongoDB URI নেই।');
             return;
         }
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log('📦 MongoDB Connected Successfully!');
+        isConnected = true;
+        console.log('📦 MongoDB Connected!');
+
+        mongoose.connection.on('disconnected', () => {
+            isConnected = false;
+            console.log('⚠️ MongoDB Disconnected');
+        });
+        mongoose.connection.on('reconnected', () => {
+            isConnected = true;
+            console.log('📦 MongoDB Reconnected');
+        });
     } catch (err) {
-        console.error('❌ MongoDB Connection Error:', err.message);
+        console.error('❌ MongoDB:', err.message);
     }
 }
 
-// চ্যাট হিস্ট্রি তুলে আনা (লাস্ট ১০টি)
-async function getChatHistory(senderId) {
+// ─── Chat History ───
+
+async function getChatHistory(senderId, limit = 10) {
+    if (!isConnected) return [];
     try {
-        const chat = await Chat.findOne({ senderId });
-        if (chat && chat.messages) {
-            return chat.messages.slice(-10); 
+        const chat = await Chat.findOne({ senderId }).lean();
+        if (chat?.messages?.length > 0) {
+            return chat.messages.slice(-limit).map(m => ({
+                role: m.role,
+                content: m.content
+            }));
         }
-        return[];
+        return [];
     } catch (err) {
-        console.error('Error getting chat history:', err);
-        return[];
+        console.error('❌ getChatHistory:', err.message);
+        return [];
     }
 }
 
-// নতুন মেসেজ ডাটাবেসে সেভ করা
 async function saveMessage(senderId, role, content) {
+    if (!isConnected) return;
     try {
         await Chat.findOneAndUpdate(
             { senderId },
-            { $push: { messages: { role, content } } },
-            { upsert: true, returnDocument: 'after' }
+            {
+                $push: {
+                    messages: {
+                        $each: [{ role, content, createdAt: new Date() }],
+                        $slice: -MAX_MESSAGES
+                    }
+                },
+                $set: { updatedAt: new Date() }
+            },
+            { upsert: true }
         );
     } catch (err) {
-        console.error('Error saving message:', err);
+        console.error('❌ saveMessage:', err.message);
     }
 }
 
-// চ্যাট হিস্ট্রি মুছে ফেলা (/clear কমান্ডের জন্য)
 async function clearHistory(senderId) {
+    if (!isConnected) return false;
     try {
-        await Chat.findOneAndDelete({ senderId });
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $set: { messages: [] } }
+        );
         return true;
     } catch (err) {
-        console.error('Error clearing history:', err);
+        console.error('❌ clearHistory:', err.message);
         return false;
     }
 }
 
-// অন্য ফাইল থেকে যাতে এই ফাংশনগুলো ব্যবহার করা যায়
+// ─── Provider & Model ───
+
+async function getProvider(senderId) {
+    if (!isConnected) return 'google';
+    try {
+        const chat = await Chat.findOne({ senderId }).lean();
+        return chat?.preferredProvider || 'google';
+    } catch (err) {
+        return 'google';
+    }
+}
+
+async function setProvider(senderId, provider) {
+    if (!isConnected) return;
+    try {
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $set: { preferredProvider: provider } },
+            { upsert: true }
+        );
+    } catch (err) {
+        console.error('❌ setProvider:', err.message);
+    }
+}
+
+async function getUserModel(senderId) {
+    if (!isConnected) return null;
+    try {
+        const chat = await Chat.findOne({ senderId }).lean();
+        return chat?.preferredModel || null;
+    } catch (err) {
+        return null;
+    }
+}
+
+async function setUserModel(senderId, model) {
+    if (!isConnected) return;
+    try {
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $set: { preferredModel: model } },
+            { upsert: true }
+        );
+    } catch (err) {
+        console.error('❌ setUserModel:', err.message);
+    }
+}
+
 module.exports = {
     connectDB,
     getChatHistory,
     saveMessage,
-    clearHistory
+    clearHistory,
+    getProvider,
+    setProvider,
+    getUserModel,
+    setUserModel
 };

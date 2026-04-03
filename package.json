@@ -1,20 +1,19 @@
 {
   "name": "messenger-ai-bot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "3.0.0",
+  "description": "Personal AI Chatbot for Facebook Messenger",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "commonjs",
   "dependencies": {
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "mongoose": "^9.3.2",
-    "remove-markdown": "^0.6.3"
+    "mongoose": "^9.3.2"
   }
 }

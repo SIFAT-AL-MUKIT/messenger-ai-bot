@@ -116,9 +116,9 @@ async function handleMessage(senderId, event) {
             `📍 বর্তমান:\n• Provider: ${currentProvider}\n• Model: ${currentModel || 'Default'}\n\nনতুন মডেল বেছে নিন:`,
             [
                 { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
-                { title: "🔥 Gemini 2.0 Flash", payload: "MODEL_google:gemini-2.0-flash" },
-                { title: "💨 Gemini 3.1 Flash lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                { title: "🧠 DeepSeek R1", payload: "MODEL_openrouter:deepseek/deepseek-r1-0528:free" },
+                { title: "✨ Gemma 4 31Geminiemini", payload: "MODEL_google:gemma-4-31b-it" },
+                { title: "🔥 Gemini 3.1 Flash lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
+                { title: "🧠 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
                 { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                 { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
             ]
@@ -212,9 +212,9 @@ async function handlePostback(senderId, postback) {
                 "কোন মডেল ব্যবহার করবেন?",
                 [
                     { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
-                    { title: "🔥 Gemini 2.0 Flash", payload: "MODEL_google:gemini-2.0-flash" },
-                    { title: "💨 Gemini 3.1 Flash Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                    { title: "🧠 DeepSeek R1", payload: "MODEL_openrouter:deepseek/deepseek-r1-0528:free" },
+                    { title: "✨ Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
+                    { title: "🔥 Gemini 3.1 Flash Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
+                    { title: "🧠 Qwen 3.5 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus" },
                     { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                     { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
                 ]

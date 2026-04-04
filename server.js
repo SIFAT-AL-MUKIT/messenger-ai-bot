@@ -117,7 +117,7 @@ async function handleMessage(senderId, event) {
             [
                 { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
                 { title: "🔥 Gemini 2.0 Flash", payload: "MODEL_google:gemini-2.0-flash" },
-                { title: "💨 Gemini Flash Lite", payload: "MODEL_google:gemini-2.0-flash-lite" },
+                { title: "💨 Gemini 3.1 Flash lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
                 { title: "🧠 DeepSeek R1", payload: "MODEL_openrouter:deepseek/deepseek-r1-0528:free" },
                 { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                 { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
@@ -213,7 +213,7 @@ async function handlePostback(senderId, postback) {
                 [
                     { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
                     { title: "🔥 Gemini 2.0 Flash", payload: "MODEL_google:gemini-2.0-flash" },
-                    { title: "💨 Gemini Flash Lite", payload: "MODEL_google:gemini-2.0-flash-lite" },
+                    { title: "💨 Gemini 3.1 Flash Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
                     { title: "🧠 DeepSeek R1", payload: "MODEL_openrouter:deepseek/deepseek-r1-0528:free" },
                     { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                     { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }

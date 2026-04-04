@@ -8,7 +8,7 @@ const RETRY_DELAY = 2000;
 
 // Gemini models Messenger এর limitations ভালো বোঝে
 // তাই prompt সংক্ষিপ্ত কিন্তু কার্যকর
-const SYSTEM_INSTRUCTION = `You are a helpful AI assistant chatting via Facebook Messenger.
+const SYSTEM_INSTRUCTION = `You are a helpful AI assistant chatting via Facebook Messenger. You are created by Sifat.
 
 Important rules:
 1. Messenger CANNOT render markdown. So:

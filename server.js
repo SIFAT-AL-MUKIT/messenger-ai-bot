@@ -4,7 +4,7 @@ const express = require('express');
 const db = require('./database');
 const utils = require('./utils');
 const messenger = require('./messenger');
-const ai = require('./ai');  // ★ openrouter এর বদলে ai router
+const ai = require('./ai');
 
 const app = express();
 app.use(express.json());
@@ -74,11 +74,11 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// ★ Message Handler
+// Message Handler
 // ═══════════════════════════════════════
 
 async function handleMessage(senderId, event) {
-    // Quick Reply → Postback হিসেবে handle
+    // Quick Reply
     if (event.message.quick_reply) {
         await handlePostback(senderId, { payload: event.message.quick_reply.payload });
         return;
@@ -100,26 +100,60 @@ async function handleMessage(senderId, event) {
         await messenger.sendButtonTemplate(senderId,
             "🤖 AI চ্যাটবট\n\nযেকোনো প্রশ্ন বা ছবি পাঠান!",
             [
-                { type: "postback", title: "🗑️ মেমরি মুছুন", payload: "CMD_CLEAR" },
                 { type: "postback", title: "🔄 মডেল বদলান", payload: "CMD_MODELS" },
+                { type: "postback", title: "🗑️ মেমরি মুছুন", payload: "CMD_CLEAR" },
                 { type: "postback", title: "ℹ️ স্ট্যাটাস", payload: "CMD_STATUS" }
             ]
         );
         return;
     }
 
+    // ★ কাস্টম মডেল: /model provider:model-name
+    if (command.startsWith('/model ')) {
+        const input = userText.trim().substring(7);
+        const colonIndex = input.indexOf(':');
+
+        if (colonIndex > 0) {
+            const provider = input.substring(0, colonIndex).toLowerCase();
+            const model = input.substring(colonIndex + 1);
+
+            if (provider === 'google' || provider === 'openrouter') {
+                await db.setProvider(senderId, provider);
+                await db.setUserModel(senderId, model);
+                const emoji = provider === 'google' ? '🟢' : '🟠';
+                await messenger.sendTextMessage(senderId,
+                    `✅ কাস্টম মডেল সেট!\n\n• Provider: ${emoji} ${provider}\n• Model: ${model}`
+                );
+            } else {
+                await messenger.sendTextMessage(senderId,
+                    `❌ Provider "google" বা "openrouter" হতে হবে।\n\nউদাহরণ:\n/model google:gemini-2.5-flash\n/model openrouter:deepseek/deepseek-r1-0528:free`
+                );
+            }
+        } else {
+            await messenger.sendTextMessage(senderId,
+                `❌ ফরম্যাট: /model provider:model-name\n\nউদাহরণ:\n/model google:gemini-2.5-flash`
+            );
+        }
+        return;
+    }
+
+    // ★ মডেল লিস্ট দেখানো
     if (command === '/model' || command === '/models') {
         const currentProvider = await db.getProvider(senderId);
         const currentModel = await db.getUserModel(senderId);
 
         await messenger.sendQuickReplies(senderId,
-            `📍 বর্তমান:\n• Provider: ${currentProvider}\n• Model: ${currentModel || 'Default'}\n\nনতুন মডেল বেছে নিন:`,
+            `📍 বর্তমান:\n• Provider: ${currentProvider}\n• Model: ${currentModel || 'Default'}\n\n` +
+            `কাস্টম মডেল সেট করতে:\n/model provider:model-name`,
             [
-                { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
-                { title: "✨ Gemma 4 31Geminiemini", payload: "MODEL_google:gemma-4-31b-it" },
-                { title: "🔥 Gemini 3.1 Flash lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                { title: "🧠 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
-                { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
+                // ★ নতুন Gemini মডেল
+                { title: "⚡ Gemini 2.5", payload: "MODEL_google:gemini-2.5-flash" },
+                { title: "🔥 Gemini 3", payload: "MODEL_google:gemini-3-flash-preview" },
+                { title: "💨 Gemini 3.1 Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
+                { title: "🧠 Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
+                // OpenRouter
+                { title: "🌀 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
+                { title: "⚡ Step 3.5 Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                 { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
             ]
         );
@@ -156,7 +190,6 @@ async function handleMessage(senderId, event) {
     const model = await db.getUserModel(senderId);
     const chatHistory = await db.getChatHistory(senderId);
 
-    // ★ ai.js রাউটার — provider অনুযায়ী সঠিক API কল করবে
     const aiReply = await ai.getAiResponse(
         chatHistory, userText, base64Image,
         senderId, provider, model
@@ -179,24 +212,24 @@ async function handleMessage(senderId, event) {
 }
 
 // ═══════════════════════════════════════
-// ★ Postback Handler (বাটন + Quick Reply)
+// Postback Handler
 // ═══════════════════════════════════════
 
 async function handlePostback(senderId, postback) {
     const payload = postback.payload;
 
-    // মডেল সিলেক্ট: "MODEL_google:gemini-2.5-flash"
+    // মডেল সিলেক্ট
     if (payload.startsWith('MODEL_')) {
         const parts = payload.replace('MODEL_', '').split(':');
-        const provider = parts[0];           // "google" বা "openrouter"
-        const model = parts.slice(1).join(':'); // মডেল নাম (: থাকতে পারে)
+        const provider = parts[0];
+        const model = parts.slice(1).join(':');
 
         await db.setProvider(senderId, provider);
         await db.setUserModel(senderId, model);
 
-        const providerEmoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
+        const emoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
         await messenger.sendTextMessage(senderId,
-            `✅ পরিবর্তন সম্পন্ন!\n\n• Provider: ${providerEmoji}\n• Model: ${model}`
+            `✅ মডেল পরিবর্তন!\n\n• Provider: ${emoji}\n• Model: ${model}`
         );
         return;
     }
@@ -211,11 +244,12 @@ async function handlePostback(senderId, postback) {
             await messenger.sendQuickReplies(senderId,
                 "কোন মডেল ব্যবহার করবেন?",
                 [
-                    { title: "⚡ Gemini 2.5 Flash", payload: "MODEL_google:gemini-2.5-flash" },
-                    { title: "✨ Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
-                    { title: "🔥 Gemini 3.1 Flash Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                    { title: "🧠 Qwen 3.5 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus" },
-                    { title: "🌀 Step Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
+                    { title: "⚡ Gemini 2.5", payload: "MODEL_google:gemini-2.5-flash" },
+                    { title: "🔥 Gemini 3", payload: "MODEL_google:gemini-3-flash-preview" },
+                    { title: "💨 Gemini 3.1 Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
+                    { title: "🧠 Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
+                    { title: "🌀 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
+                    { title: "⚡ Step 3.5 Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
                     { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
                 ]
             );
@@ -225,11 +259,11 @@ async function handlePostback(senderId, postback) {
             const prov = await db.getProvider(senderId);
             const mod = await db.getUserModel(senderId);
             const hist = await db.getChatHistory(senderId);
-            const provEmoji = prov === 'google' ? '🟢 Google' : '🟠 OpenRouter';
+            const emoji = prov === 'google' ? '🟢 Google' : '🟠 OpenRouter';
 
             await messenger.sendTextMessage(senderId,
                 `📊 বট স্ট্যাটাস\n\n` +
-                `• Provider: ${provEmoji}\n` +
+                `• Provider: ${emoji}\n` +
                 `• Model: ${mod || 'Default'}\n` +
                 `• মেমরি: ${hist.length}টি মেসেজ\n` +
                 `• আপটাইম: ${Math.floor(process.uptime())}s`

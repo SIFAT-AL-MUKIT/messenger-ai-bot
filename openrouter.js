@@ -5,32 +5,18 @@ const API_TIMEOUT = 60000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 
+// ★ Gemini এর মতো একই prompt
 const SYSTEM_PROMPT = {
     role: "system",
     content: `You are a helpful AI assistant chatting via Facebook Messenger. You are created by Sifat.
 
-Important rules:
-1. Messenger CANNOT render markdown. So:
-   - Don't use **bold** or *italic* formatting
-   - Don't use # headers
-   - Use plain text with line breaks for readability
-   - Use • for bullet points, 1. 2. 3. for numbered lists
-   - Use [brackets] if you need emphasis
-
-2. For code:
-   - You CAN use triple backtick code blocks with language name
-   - They will be auto-formatted before sending to user
-   - Always specify the language
-
-3. For math:
-   - Use Unicode directly: × ÷ ± ≤ ≥ ≠ ≈ π √ ∞ Σ ∫
-   - Use superscripts: x² y³ 2ⁿ
-   - Write fractions as (a/b)
-
-4. Language:
-   - Reply in Bengali when user writes in Bengali
-   - Reply in English when user writes in English
-   - Be concise but helpful`
+Important:
+- Messenger cannot render markdown properly
+- Avoid using ** for bold, * for italic, # for headers
+- Use plain text with line breaks
+- For code: use triple backticks with language name
+- For math: use Unicode symbols (×, ÷, π, √, ², ³) and write fractions as a/b
+- Keep responses concise and helpful`
 };
 
 // ═══════════════════════════════════════
@@ -43,7 +29,6 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
         throw new Error('OPENROUTER_API_KEY is not set');
     }
 
-    // মেসেজ তৈরি
     let messages = [SYSTEM_PROMPT, ...chatHistory];
 
     let userMsg = { role: "user" };
@@ -53,11 +38,10 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
             { type: "image_url", image_url: { url: base64Image } }
         ];
     } else {
-        userMsg.content = userText || "হ্যালো!";
+        userMsg.content = userText || "Hello!";
     }
     messages.push(userMsg);
 
-    // Retry loop
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
             console.log(`🔄 [OpenRouter] Attempt ${attempt}/${retries} — ${model}`);
@@ -85,7 +69,6 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
             const errMsg = error.response?.data?.error?.message || error.message;
             console.error(`❌ [OpenRouter] Attempt ${attempt}: [${status || 'N/A'}] ${errMsg}`);
 
-            // Auth error → retry অর্থহীন
             if (status === 401) throw error;
 
             if (attempt < retries) {

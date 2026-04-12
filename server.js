@@ -25,6 +25,23 @@ if (process.env.RENDER_URL) {
     }, 13 * 60 * 1000);
 }
 
+// ─── Model List ───
+
+const GOOGLE_MODELS = [
+    { title: '⚡ Gemini 2.5 Flash',       payload: 'MODEL_google:gemini-2.5-flash' },
+    { title: '🔥 Gemini 3 Flash',         payload: 'MODEL_google:gemini-3-flash-preview' },
+    { title: '💨 Gemini 3.1 Flash Lite',  payload: 'MODEL_google:gemini-3.1-flash-lite-preview' },
+    { title: '🟣 Gemma 4 31B',            payload: 'MODEL_google:gemma-4-31b-it' },
+];
+
+const OPENROUTER_MODELS = [
+    { title: '🎲 Auto (OR)',              payload: 'MODEL_openrouter:openrouter/auto' },
+    { title: '🧠 Qwen3 Plus',            payload: 'MODEL_openrouter:qwen/qwen3-plus:free' },
+    { title: '🌀 Step Flash',            payload: 'MODEL_openrouter:stepfun/step-3.5-flash:free' },
+];
+
+const ALL_MODELS = [...GOOGLE_MODELS, ...OPENROUTER_MODELS];
+
 // Health Check
 app.get('/', (req, res) => {
     res.status(200).json({ status: 'alive', uptime: Math.floor(process.uptime()) + 's' });
@@ -65,7 +82,7 @@ app.post('/webhook', async (req, res) => {
                 await handlePostback(senderId, event.postback);
             }
         } catch (error) {
-            console.error(`❌ Error:`, error.message);
+            console.error('❌ Error:', error.message);
             try {
                 await messenger.sendTextMessage(senderId, '❌ সমস্যা হয়েছে। আবার চেষ্টা করুন।');
             } catch (e) { }
@@ -74,89 +91,46 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// Message Handler
+// ★ Message Handler
 // ═══════════════════════════════════════
 
 async function handleMessage(senderId, event) {
-    // Quick Reply
+    // Quick Reply → Postback হিসেবে handle
     if (event.message.quick_reply) {
         await handlePostback(senderId, { payload: event.message.quick_reply.payload });
         return;
     }
 
-    let userText = event.message.text || "";
-    let base64Image = null;
+    const userText = event.message.text || '';
     const command = userText.trim().toLowerCase();
 
     // ───── Commands ─────
 
     if (command === '/clear') {
         await db.clearHistory(senderId);
-        await messenger.sendTextMessage(senderId, "✅ চ্যাট মেমরি মুছে ফেলা হয়েছে!");
+        await messenger.sendTextMessage(senderId, '✅ চ্যাট মেমরি ও ছবি মুছে ফেলা হয়েছে!');
         return;
     }
 
     if (command === '/help') {
         await messenger.sendButtonTemplate(senderId,
-            "🤖 AI চ্যাটবট\n\nযেকোনো প্রশ্ন বা ছবি পাঠান!",
+            '🤖 AI চ্যাটবট\n\nযেকোনো প্রশ্ন বা ছবি পাঠান!',
             [
-                { type: "postback", title: "🔄 মডেল বদলান", payload: "CMD_MODELS" },
-                { type: "postback", title: "🗑️ মেমরি মুছুন", payload: "CMD_CLEAR" },
-                { type: "postback", title: "ℹ️ স্ট্যাটাস", payload: "CMD_STATUS" }
+                { type: 'postback', title: '🗑️ মেমরি মুছুন', payload: 'CMD_CLEAR' },
+                { type: 'postback', title: '🔄 মডেল বদলান', payload: 'CMD_MODELS' },
+                { type: 'postback', title: 'ℹ️ স্ট্যাটাস',   payload: 'CMD_STATUS' }
             ]
         );
         return;
     }
 
-    // ★ কাস্টম মডেল: /model provider:model-name
-    if (command.startsWith('/model ')) {
-        const input = userText.trim().substring(7);
-        const colonIndex = input.indexOf(':');
-
-        if (colonIndex > 0) {
-            const provider = input.substring(0, colonIndex).toLowerCase();
-            const model = input.substring(colonIndex + 1);
-
-            if (provider === 'google' || provider === 'openrouter') {
-                await db.setProvider(senderId, provider);
-                await db.setUserModel(senderId, model);
-                const emoji = provider === 'google' ? '🟢' : '🟠';
-                await messenger.sendTextMessage(senderId,
-                    `✅ কাস্টম মডেল সেট!\n\n• Provider: ${emoji} ${provider}\n• Model: ${model}`
-                );
-            } else {
-                await messenger.sendTextMessage(senderId,
-                    `❌ Provider "google" বা "openrouter" হতে হবে।\n\nউদাহরণ:\n/model google:gemini-2.5-flash\n/model openrouter:deepseek/deepseek-r1-0528:free`
-                );
-            }
-        } else {
-            await messenger.sendTextMessage(senderId,
-                `❌ ফরম্যাট: /model provider:model-name\n\nউদাহরণ:\n/model google:gemini-2.5-flash`
-            );
-        }
+    if (command === '/status') {
+        await handlePostback(senderId, { payload: 'CMD_STATUS' });
         return;
     }
 
-    // ★ মডেল লিস্ট দেখানো
     if (command === '/model' || command === '/models') {
-        const currentProvider = await db.getProvider(senderId);
-        const currentModel = await db.getUserModel(senderId);
-
-        await messenger.sendQuickReplies(senderId,
-            `📍 বর্তমান:\n• Provider: ${currentProvider}\n• Model: ${currentModel || 'Default'}\n\n` +
-            `কাস্টম মডেল সেট করতে:\n/model provider:model-name`,
-            [
-                // ★ নতুন Gemini মডেল
-                { title: "⚡ Gemini 2.5", payload: "MODEL_google:gemini-2.5-flash" },
-                { title: "🔥 Gemini 3", payload: "MODEL_google:gemini-3-flash-preview" },
-                { title: "💨 Gemini 3.1 Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                { title: "🧠 Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
-                // OpenRouter
-                { title: "🌀 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
-                { title: "⚡ Step 3.5 Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
-                { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
-            ]
-        );
+        await handlePostback(senderId, { payload: 'CMD_MODELS' });
         return;
     }
 
@@ -164,72 +138,87 @@ async function handleMessage(senderId, event) {
 
     if (event.message.attachments) {
         const attachment = event.message.attachments[0];
+
         if (attachment.type === 'image') {
-            console.log('📷 Image received!');
-            base64Image = await utils.imageUrlToBase64(attachment.payload.url);
-            if (!base64Image) {
-                await messenger.sendTextMessage(senderId, "⚠️ ছবি প্রসেস করতে পারিনি।");
+            console.log('📷 Image received, saving to DB...');
+            await messenger.sendTypingOn(senderId);
+
+            const base64 = await utils.imageUrlToBase64(attachment.payload.url);
+            if (!base64) {
+                await messenger.sendTextMessage(senderId, '⚠️ ছবি প্রসেস করতে পারিনি।');
                 return;
             }
-        } else if (attachment.type === 'audio') {
-            await messenger.sendTextMessage(senderId, "🎤 ভয়েস মেসেজ এখনো সাপোর্ট করি না।");
+
+            await db.addPendingImage(senderId, base64);
+            await messenger.sendTypingOff(senderId);
+            await messenger.sendTextMessage(senderId, '📷 ছবি পেয়েছি! এখন কোনো প্রশ্ন করুন।');
             return;
-        } else if (!userText) {
-            await messenger.sendTextMessage(senderId, "⚠️ শুধু টেক্সট ও ছবি সাপোর্ট করি।");
+        }
+
+        if (attachment.type === 'audio') {
+            await messenger.sendTextMessage(senderId, '🎤 ভয়েস মেসেজ এখনো সাপোর্ট করি না।');
+            return;
+        }
+
+        if (!userText) {
+            await messenger.sendTextMessage(senderId, '⚠️ শুধু টেক্সট ও ছবি সাপোর্ট করি।');
             return;
         }
     }
 
-    if (!userText && !base64Image) return;
+    if (!userText) return;
 
     // ───── AI Response ─────
 
     await messenger.sendTypingOn(senderId);
 
-    const provider = await db.getProvider(senderId);
-    const model = await db.getUserModel(senderId);
-    const chatHistory = await db.getChatHistory(senderId);
+    const provider     = await db.getProvider(senderId);
+    const model        = await db.getUserModel(senderId);
+    const chatHistory  = await db.getChatHistory(senderId);
+    const pendingImages = await db.getPendingImages(senderId);
 
     const aiReply = await ai.getAiResponse(
-        chatHistory, userText, base64Image,
+        chatHistory, userText, pendingImages,
         senderId, provider, model
     );
 
-    const cleanReply = utils.cleanText(aiReply);
-
-    // DB তে সেভ
-    if (userText && base64Image) {
-        await db.saveMessage(senderId, 'user', userText + " [📷 ছবিসহ]");
-    } else if (userText) {
-        await db.saveMessage(senderId, 'user', userText);
-    } else {
-        await db.saveMessage(senderId, 'user', "[📷 ছবি]");
+    // OpenRouter + ছবি ছিল → Gemini bridge ব্যবহার হয়েছে → images clear
+    if (provider === 'openrouter' && pendingImages.length > 0) {
+        await db.clearPendingImages(senderId);
     }
-    await db.saveMessage(senderId, 'assistant', cleanReply);
+
+    // DB তে save
+    const userContent = pendingImages.length > 0
+        ? `${userText} [📷 ${pendingImages.length}টি ছবিসহ]`
+        : userText;
+
+    await db.saveMessage(senderId, 'user', userContent);
+    await db.saveMessage(senderId, 'assistant', aiReply);
 
     await messenger.sendTypingOff(senderId);
-    await messenger.sendTextMessage(senderId, cleanReply);
+    await messenger.sendTextMessage(senderId, aiReply);
 }
 
 // ═══════════════════════════════════════
-// Postback Handler
+// ★ Postback Handler
 // ═══════════════════════════════════════
 
 async function handlePostback(senderId, postback) {
     const payload = postback.payload;
 
-    // মডেল সিলেক্ট
+    // মডেল সিলেক্ট: "MODEL_google:gemini-2.5-flash"
     if (payload.startsWith('MODEL_')) {
-        const parts = payload.replace('MODEL_', '').split(':');
-        const provider = parts[0];
-        const model = parts.slice(1).join(':');
+        const rest     = payload.replace('MODEL_', '');
+        const colonIdx = rest.indexOf(':');
+        const provider = rest.substring(0, colonIdx);
+        const model    = rest.substring(colonIdx + 1);
 
         await db.setProvider(senderId, provider);
         await db.setUserModel(senderId, model);
 
-        const emoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
+        const providerEmoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
         await messenger.sendTextMessage(senderId,
-            `✅ মডেল পরিবর্তন!\n\n• Provider: ${emoji}\n• Model: ${model}`
+            `✅ পরিবর্তন সম্পন্ন!\n\n• Provider: ${providerEmoji}\n• Model: ${model}`
         );
         return;
     }
@@ -237,52 +226,48 @@ async function handlePostback(senderId, postback) {
     switch (payload) {
         case 'CMD_CLEAR':
             await db.clearHistory(senderId);
-            await messenger.sendTextMessage(senderId, "✅ মেমরি মুছে ফেলা হয়েছে!");
+            await messenger.sendTextMessage(senderId, '✅ মেমরি ও ছবি মুছে ফেলা হয়েছে!');
             break;
 
         case 'CMD_MODELS':
             await messenger.sendQuickReplies(senderId,
-                "কোন মডেল ব্যবহার করবেন?",
-                [
-                    { title: "⚡ Gemini 2.5", payload: "MODEL_google:gemini-2.5-flash" },
-                    { title: "🔥 Gemini 3", payload: "MODEL_google:gemini-3-flash-preview" },
-                    { title: "💨 Gemini 3.1 Lite", payload: "MODEL_google:gemini-3.1-flash-lite-preview" },
-                    { title: "🧠 Gemma 4 31B", payload: "MODEL_google:gemma-4-31b-it" },
-                    { title: "🌀 Qwen 3.6 Plus", payload: "MODEL_openrouter:qwen/qwen3.6-plus:free" },
-                    { title: "⚡ Step 3.5 Flash", payload: "MODEL_openrouter:stepfun/step-3.5-flash:free" },
-                    { title: "🎲 Auto (OR)", payload: "MODEL_openrouter:openrouter/free" }
-                ]
+                '🔄 মডেল বেছে নিন:',
+                ALL_MODELS
             );
             break;
 
-        case 'CMD_STATUS':
+        case 'CMD_STATUS': {
             const prov = await db.getProvider(senderId);
-            const mod = await db.getUserModel(senderId);
+            const mod  = await db.getUserModel(senderId);
             const hist = await db.getChatHistory(senderId);
-            const emoji = prov === 'google' ? '🟢 Google' : '🟠 OpenRouter';
+            const imgs = await db.getPendingImages(senderId);
+            const provEmoji = prov === 'google' ? '🟢 Google' : '🟠 OpenRouter';
 
             await messenger.sendTextMessage(senderId,
                 `📊 বট স্ট্যাটাস\n\n` +
-                `• Provider: ${emoji}\n` +
+                `• Provider: ${provEmoji}\n` +
                 `• Model: ${mod || 'Default'}\n` +
                 `• মেমরি: ${hist.length}টি মেসেজ\n` +
+                `• Pending ছবি: ${imgs.length}টি\n` +
                 `• আপটাইম: ${Math.floor(process.uptime())}s`
             );
             break;
+        }
 
         case 'GET_STARTED':
             await messenger.sendTextMessage(senderId,
-                "👋 স্বাগতম!\n\n" +
-                "আমি AI চ্যাটবট। যেকোনো প্রশ্ন করুন বা ছবি পাঠান!\n\n" +
-                "📋 কমান্ড:\n" +
-                "/help — সাহায্য\n" +
-                "/model — মডেল বদলান\n" +
-                "/clear — মেমরি মুছুন"
+                '👋 স্বাগতম!\n\n' +
+                'আমি AI চ্যাটবট। যেকোনো প্রশ্ন করুন বা ছবি পাঠান!\n\n' +
+                '📋 কমান্ড:\n' +
+                '/help — সাহায্য\n' +
+                '/model — মডেল বদলান\n' +
+                '/status — স্ট্যাটাস\n' +
+                '/clear — মেমরি মুছুন'
             );
             break;
 
         default:
-            await messenger.sendTextMessage(senderId, "🤔 অপরিচিত কমান্ড। /help লিখুন।");
+            await messenger.sendTextMessage(senderId, '🤔 অপরিচিত কমান্ড। /help লিখুন।');
     }
 }
 

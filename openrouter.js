@@ -1,46 +1,32 @@
 const axios = require('axios');
+const { SYSTEM_INSTRUCTION } = require('./gemini');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const API_TIMEOUT = 60000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 
-// ★ Gemini এর মতো একই prompt
+// Gemini এর সাথে একই system prompt
 const SYSTEM_PROMPT = {
-    role: "system",
-    content: `You are a helpful AI assistant chatting via Facebook Messenger. You are created by Sifat.
-
-Important:
-- Messenger cannot render markdown properly
-- Avoid using ** for bold, * for italic, # for headers
-- Use plain text with line breaks
-- For code: use triple backticks with language name
-- For math: use Unicode symbols (×, ÷, π, √, ², ³) and write fractions as a/b
-- Keep responses concise and helpful`
+    role: 'system',
+    content: SYSTEM_INSTRUCTION
 };
 
 // ═══════════════════════════════════════
-// OpenRouter API Call (retry সহ)
+// OpenRouter API Call — text only
+// ছবি এখানে আসে না, ai.js থেকে Gemini-তে পাঠানো হয়
 // ═══════════════════════════════════════
 
-async function getResponse(chatHistory, userText, base64Image, model, retries = MAX_RETRIES) {
-
+async function getResponse(chatHistory, userText, model, retries = MAX_RETRIES) {
     if (!OPENROUTER_API_KEY) {
         throw new Error('OPENROUTER_API_KEY is not set');
     }
 
-    let messages = [SYSTEM_PROMPT, ...chatHistory];
-
-    let userMsg = { role: "user" };
-    if (base64Image) {
-        userMsg.content = [
-            { type: "text", text: userText || "এই ছবিতে কী আছে?" },
-            { type: "image_url", image_url: { url: base64Image } }
-        ];
-    } else {
-        userMsg.content = userText || "Hello!";
-    }
-    messages.push(userMsg);
+    const messages = [
+        SYSTEM_PROMPT,
+        ...chatHistory,
+        { role: 'user', content: userText || 'হ্যালো!' }
+    ];
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {

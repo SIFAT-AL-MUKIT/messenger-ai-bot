@@ -6,69 +6,66 @@ const API_TIMEOUT = 60000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 
-// ═══════════════════════════════════════
-// ★ সহজ System Prompt
-// ═══════════════════════════════════════
-
+// ─── Unified System Prompt ───
+// openrouter.js এও একই prompt ব্যবহার হয়
 const SYSTEM_INSTRUCTION = `You are a helpful AI assistant chatting via Facebook Messenger. You are created by Sifat.
 
-Important:
-- Messenger cannot render markdown properly
-- Avoid using ** for bold, * for italic, # for headers
-- Use plain text with line breaks
-- For code: use triple backticks with language name
-- For math: use Unicode symbols (×, ÷, π, √, ², ³) and write fractions as a/b
-- Keep responses concise and helpful`;
+Formatting rules — Messenger cannot render markdown, so:
+1. Never use **bold**, *italic*, or # headers
+2. Use plain text with line breaks for readability
+3. Use • for bullet points, 1. 2. 3. for numbered lists
+4. Use [brackets] for emphasis if needed
+5. For code: use triple backtick blocks with a language name
+6. For math: use Unicode directly (×, ÷, ±, π, √, ∞, x², etc.)
+7. Reply in the same language the user writes in`;
 
 // ═══════════════════════════════════════
-// Chat History → Gemini Format
+// OpenAI-style history → Gemini format
 // ═══════════════════════════════════════
+// - "assistant" → "model"
+// - system prompt আলাদা (system_instruction)
+// - contents এ user/model পর্যায়ক্রমে আসতে হবে
+// - ছবি → inline_data (raw base64, prefix ছাড়া)
 
-function buildContents(chatHistory, userText, base64Image) {
+function buildContents(chatHistory, userText, base64Images) {
     const contents = [];
 
-    // চ্যাট হিস্ট্রি
+    // Chat history
     for (const msg of chatHistory) {
-        const role = msg.role === 'assistant' ? 'model' : 'user';
-        const lastItem = contents[contents.length - 1];
-
-        if (lastItem && lastItem.role === role) {
-            lastItem.parts.push({ text: msg.content });
-        } else {
-            contents.push({
-                role,
-                parts: [{ text: msg.content }]
-            });
-        }
+        contents.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+        });
     }
 
-    // বর্তমান মেসেজ
+    // Current user message parts
     const userParts = [];
 
     if (userText) {
         userParts.push({ text: userText });
     }
 
-    if (base64Image) {
-        if (!userText) {
-            userParts.push({ text: "এই ছবিতে কী আছে বিস্তারিত বলো।" });
-        }
-        const match = base64Image.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-            userParts.push({
-                inline_data: {
-                    mime_type: match[1],
-                    data: match[2]
-                }
-            });
+    // সব pending images যোগ করা
+    if (base64Images && base64Images.length > 0) {
+        for (const base64Image of base64Images) {
+            const match = base64Image.match(/^data:([^;]+);base64,(.+)$/s);
+            if (match) {
+                userParts.push({
+                    inline_data: {
+                        mime_type: match[1],
+                        data: match[2]  // raw base64, prefix ছাড়া
+                    }
+                });
+            }
         }
     }
 
     if (userParts.length === 0) {
-        userParts.push({ text: "Hello!" });
+        userParts.push({ text: 'হ্যালো!' });
     }
 
-    // Gemini র নিয়ম: user → model → user পর্যায়ক্রমে
+    // Gemini requires strictly alternating user/model roles
+    // শেষ item "user" হলে একটা dummy "model" দিতে হবে
     const lastItem = contents[contents.length - 1];
     if (lastItem && lastItem.role === 'user') {
         contents.push({ role: 'model', parts: [{ text: '.' }] });
@@ -76,7 +73,7 @@ function buildContents(chatHistory, userText, base64Image) {
 
     contents.push({ role: 'user', parts: userParts });
 
-    // প্রথম মেসেজ model হলে fix
+    // প্রথম মেসেজ "model" হলে Gemini error দেয়
     if (contents.length > 0 && contents[0].role === 'model') {
         contents.unshift({ role: 'user', parts: [{ text: '.' }] });
     }
@@ -88,17 +85,21 @@ function buildContents(chatHistory, userText, base64Image) {
 // Gemini API Call (retry সহ)
 // ═══════════════════════════════════════
 
-async function getResponse(chatHistory, userText, base64Image, model, retries = MAX_RETRIES) {
-
+async function getResponse(chatHistory, userText, base64Images, model, retries = MAX_RETRIES) {
     if (!GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not set');
     }
 
-    const contents = buildContents(chatHistory, userText, base64Image);
+    // Single string বা array — দুটোই handle করা
+    const imagesArray = Array.isArray(base64Images)
+        ? base64Images
+        : (base64Images ? [base64Images] : []);
+
+    const contents = buildContents(chatHistory, userText, imagesArray);
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            console.log(`🔄 [Gemini] Attempt ${attempt}/${retries} — ${model}`);
+            console.log(`🔄 [Gemini] Attempt ${attempt}/${retries} — ${model} | Images: ${imagesArray.length}`);
 
             const response = await axios.post(
                 `${BASE_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`,
@@ -123,10 +124,10 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
 
             if (!candidate?.content?.parts) {
                 const reason = candidate?.finishReason || 'UNKNOWN';
-                throw new Error(`No content. Reason: ${reason}`);
+                throw new Error(`No content. Finish reason: ${reason}`);
             }
 
-            // Thinking parts filter
+            // Gemini 2.5+ thinking parts ফিল্টার করা
             const textParts = candidate.content.parts
                 .filter(p => !p.thought)
                 .map(p => p.text)
@@ -135,7 +136,7 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
             const text = textParts.join('\n').trim();
 
             if (!text) {
-                throw new Error('Empty response');
+                throw new Error('Empty text after filtering');
             }
 
             console.log(`✅ [Gemini] Success on attempt ${attempt}`);
@@ -146,6 +147,7 @@ async function getResponse(chatHistory, userText, base64Image, model, retries = 
             const errMsg = error.response?.data?.error?.message || error.message;
             console.error(`❌ [Gemini] Attempt ${attempt}: [${status || 'N/A'}] ${errMsg}`);
 
+            // Auth error → retry করে লাভ নেই
             if (status === 403 || status === 401) {
                 throw error;
             }
@@ -165,4 +167,4 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-module.exports = { getResponse };
+module.exports = { getResponse, SYSTEM_INSTRUCTION };

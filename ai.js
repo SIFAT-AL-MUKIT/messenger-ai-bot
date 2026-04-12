@@ -2,62 +2,101 @@ const gemini = require('./gemini');
 const openrouter = require('./openrouter');
 const messenger = require('./messenger');
 
-// ★ নতুন default মডেল
 const DEFAULTS = {
     google: 'gemini-2.5-flash',
-    openrouter: 'openrouter/free'
+    openrouter: 'openrouter/auto'
 };
 
-async function getAiResponse(chatHistory, userText, base64Image, senderId, provider, model) {
+// OpenRouter provider-এ ছবি একবার process করার জন্য Gemini bridge model
+const IMAGE_BRIDGE_MODEL = 'gemini-3-flash-preview';
+
+// ═══════════════════════════════════════
+// ★ মূল AI Response ফাংশন
+// ═══════════════════════════════════════
+//
+// pendingImages: base64 array (DB থেকে আসে)
+//
+// Google provider:
+//   → প্রতিটি message-এ সব pending images পাঠানো হয়
+//   → images কখনো auto-clear হয় না, শুধু /clear তে মুছে যায়
+//
+// OpenRouter provider:
+//   → ছবি থাকলে একবারের জন্য Gemini bridge model দিয়ে process
+//   → তারপর images clear, এরপর থেকে OpenRouter text-only
+
+async function getAiResponse(chatHistory, userText, pendingImages, senderId, provider, model) {
     provider = provider || 'google';
     model = model || DEFAULTS[provider] || DEFAULTS.google;
+    pendingImages = pendingImages || [];
 
-    console.log(`\n🤖 Provider: ${provider} | Model: ${model}`);
+    console.log(`\n🤖 Provider: ${provider} | Model: ${model} | Images: ${pendingImages.length}`);
 
-    // Google
+    // ─────────────────────────────────
+    // Google Provider
+    // ─────────────────────────────────
     if (provider === 'google') {
         try {
-            return await gemini.getResponse(chatHistory, userText, base64Image, model);
+            // images প্রতিবারই পাঠানো হয়, clear না হওয়া পর্যন্ত
+            return await gemini.getResponse(chatHistory, userText, pendingImages, model);
+
         } catch (error) {
-            console.error(`❌ Google failed. Trying OpenRouter...`);
+            console.error(`❌ Google "${model}" failed. Trying OpenRouter fallback...`);
 
             if (senderId) {
-                await messenger.sendTextMessage(senderId, `⚠️ Google সমস্যা। OpenRouter ব্যাকআপ...`);
+                await messenger.sendTextMessage(senderId,
+                    '⚠️ Google মডেল সমস্যা। OpenRouter ব্যাকআপ ব্যবহার করছি...'
+                );
             }
 
             try {
-                const fallbackText = base64Image && !userText
-                    ? "ছবি বিশ্লেষণ করতে পারিনি।"
-                    : userText;
-
-                return await openrouter.getResponse(
-                    chatHistory, fallbackText, null,
-                    DEFAULTS.openrouter, 2
-                );
+                // Fallback: text-only OpenRouter
+                return await openrouter.getResponse(chatHistory, userText, DEFAULTS.openrouter, 2);
             } catch (e) {
-                return "দুঃখিত, সব AI মডেল সমস্যায় আছে। কিছুক্ষণ পর চেষ্টা করুন। 🙏";
+                console.error('❌ OpenRouter fallback also failed');
+                return 'দুঃখিত, সব AI মডেল এখন সমস্যায় আছে। কিছুক্ষণ পর চেষ্টা করুন। 🙏';
             }
         }
     }
 
-    // OpenRouter
+    // ─────────────────────────────────
+    // OpenRouter Provider
+    // ─────────────────────────────────
     else {
+        // ছবি আছে → Gemini bridge দিয়ে একবার process
+        if (pendingImages.length > 0) {
+            console.log(`📷 Image bridge: ${IMAGE_BRIDGE_MODEL}`);
+            try {
+                return await gemini.getResponse(chatHistory, userText, pendingImages, IMAGE_BRIDGE_MODEL);
+                // server.js এ response পাওয়ার পর pendingImages clear হবে
+            } catch (error) {
+                console.error(`❌ Image bridge failed: ${error.message}. Falling back to text-only...`);
+                if (senderId) {
+                    await messenger.sendTextMessage(senderId,
+                        '⚠️ ছবি বিশ্লেষণে সমস্যা। টেক্সট উত্তর দিচ্ছি...'
+                    );
+                }
+                // Bridge fail করলেও images clear হবে (server.js এ)
+            }
+        }
+
+        // Text-only OpenRouter call
         try {
-            return await openrouter.getResponse(chatHistory, userText, base64Image, model);
+            return await openrouter.getResponse(chatHistory, userText, model);
+
         } catch (error) {
-            console.error(`❌ OpenRouter failed. Trying Google...`);
+            console.error(`❌ OpenRouter "${model}" failed. Trying Google fallback...`);
 
             if (senderId) {
-                await messenger.sendTextMessage(senderId, `⚠️ OpenRouter সমস্যা। Google ব্যাকআপ...`);
+                await messenger.sendTextMessage(senderId,
+                    '⚠️ OpenRouter সমস্যা। Google ব্যাকআপ ব্যবহার করছি...'
+                );
             }
 
             try {
-                return await gemini.getResponse(
-                    chatHistory, userText, base64Image,
-                    DEFAULTS.google, 2
-                );
+                return await gemini.getResponse(chatHistory, userText, [], DEFAULTS.google, 2);
             } catch (e) {
-                return "দুঃখিত, সব AI মডেল সমস্যায় আছে। কিছুক্ষণ পর চেষ্টা করুন। 🙏";
+                console.error('❌ Google fallback also failed');
+                return 'দুঃখিত, সব AI মডেল এখন সমস্যায় আছে। কিছুক্ষণ পর চেষ্টা করুন। 🙏';
             }
         }
     }

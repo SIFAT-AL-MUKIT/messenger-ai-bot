@@ -4,7 +4,7 @@ const MAX_MESSAGES = 30;
 
 const chatSchema = new mongoose.Schema({
     senderId: { type: String, required: true, unique: true, index: true },
-    preferredProvider: { type: String, default: 'google' },  // ★ নতুন
+    preferredProvider: { type: String, default: 'google' },
     preferredModel: { type: String, default: null },
     messages: [
         {
@@ -13,6 +13,7 @@ const chatSchema = new mongoose.Schema({
             createdAt: { type: Date, default: Date.now }
         }
     ],
+    pendingImages: [{ type: String }],  // base64 strings
     updatedAt: { type: Date, default: Date.now }
 });
 
@@ -86,14 +87,55 @@ async function saveMessage(senderId, role, content) {
 async function clearHistory(senderId) {
     if (!isConnected) return false;
     try {
+        // messages এবং pendingImages দুটোই মুছে যাবে
         await Chat.findOneAndUpdate(
             { senderId },
-            { $set: { messages: [] } }
+            { $set: { messages: [], pendingImages: [] } }
         );
         return true;
     } catch (err) {
         console.error('❌ clearHistory:', err.message);
         return false;
+    }
+}
+
+// ─── Pending Images ───
+
+async function addPendingImage(senderId, base64) {
+    if (!isConnected) return;
+    try {
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $push: { pendingImages: base64 } },
+            { upsert: true }
+        );
+        console.log('📷 Pending image saved to DB');
+    } catch (err) {
+        console.error('❌ addPendingImage:', err.message);
+    }
+}
+
+async function getPendingImages(senderId) {
+    if (!isConnected) return [];
+    try {
+        const chat = await Chat.findOne({ senderId }).lean();
+        return chat?.pendingImages || [];
+    } catch (err) {
+        console.error('❌ getPendingImages:', err.message);
+        return [];
+    }
+}
+
+async function clearPendingImages(senderId) {
+    if (!isConnected) return;
+    try {
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $set: { pendingImages: [] } }
+        );
+        console.log('🗑️ Pending images cleared');
+    } catch (err) {
+        console.error('❌ clearPendingImages:', err.message);
     }
 }
 
@@ -150,6 +192,9 @@ module.exports = {
     getChatHistory,
     saveMessage,
     clearHistory,
+    addPendingImage,
+    getPendingImages,
+    clearPendingImages,
     getProvider,
     setProvider,
     getUserModel,

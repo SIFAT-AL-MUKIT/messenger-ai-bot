@@ -1,123 +1,217 @@
+# ⚡ AI Messenger Chatbot v3.0
 
-# ⚡ AI Messenger Chatbot (Free & Multi-modal)
-
-এই রিপোজিটরিতে একটি সম্পূর্ণ ফ্রি, মাল্টি-মোডাল (টেক্সট এবং ছবি সাপোর্ট করে) এবং মেমরি-সমৃদ্ধ Facebook Messenger AI Chatbot এর সোর্স কোড দেওয়া আছে। প্রজেক্টটি এমনভাবে ডিজাইন করা হয়েছে যেন এটি তৈরি করতে **কোনো ক্রেডিট কার্ডের প্রয়োজন না হয়** এবং চাইলে সম্পূর্ণ **মোবাইল (Termux)** ব্যবহার করেও এটি সেটআপ ও ডেপ্লয় করা যায়!
-
-## ✨ প্রজেক্টের মূল ফিচারসমূহ
-- **Multi-modal AI:** সাধারণ চ্যাটের পাশাপাশি ছবি পাঠালে এটি ছবি স্ক্যান করে উত্তর দিতে পারে।
-- **Dual-Model Routing:** শুধু টেক্সট চ্যাটের জন্য ফাস্ট মডেল এবং ছবির জন্য ভিশন মডেল অটোমেটিক সুইচ করে।
-- **Auto-Fallback System (Self-healing):** মূল এআই মডেল ডাউন থাকলে বা লিমিট শেষ হলে এটি নিজে থেকেই ব্যাকআপ মডেলে (`openrouter/free`) শিফট করে মেসেঞ্জারে অ্যালার্ট পাঠিয়ে দেয়। বট কখনোই ক্র্যাশ করবে না!
-- **Long-term Memory:** MongoDB ডাটাবেস যুক্ত থাকায় এটি ইউজারের আগের কথা মনে রাখতে পারে।
-- **Security Locked:** শুধুমাত্র নির্দিষ্ট ইউজারের (Admin) মেসেজেই বট রিপ্লাই দেবে, অন্য কেউ মেসেজ দিলে বটের API লিমিট নষ্ট হবে না।
-- **Command System:** মেসেঞ্জারে `/clear` লিখলেই বটের ব্রেইন (আগের চ্যাট হিস্ট্রি) ডিলিট হয়ে যাবে।
+Facebook Messenger-এ AI চ্যাটবট। Google Gemini এবং OpenRouter — দুটো provider সাপোর্ট করে। ছবি বিশ্লেষণ, দীর্ঘমেয়াদী মেমরি, এবং অটো-ফলব্যাক সিস্টেম সহ। সম্পূর্ণ ফ্রি, কোনো ক্রেডিট কার্ড ছাড়াই চালানো যায়।
 
 ---
 
-## 🛠️ যা যা প্রয়োজন (Prerequisites)
-এই প্রজেক্টটি রান করার জন্য আপনার নিচের ৫টি ফ্রি একাউন্ট ও টুলস লাগবে:
-1. **Node.js** (কম্পিউটার বা Termux-এ ইনস্টল করা থাকতে হবে)।
-2. **OpenRouter Account:** ফ্রিতে AI API Key পাওয়ার জন্য।
-3. **MongoDB Atlas Account:** ফ্রিতে ডাটাবেস (মেমরি) তৈরি করার জন্য।
-4. **Facebook Developer Account:** পেজ এবং Webhook সেটআপ করার জন্য।
-5. **Render বা Koyeb Account:** কোডটি ২৪ ঘণ্টা ইন্টারনেটে লাইভ (Host) রাখার জন্য।
+## ✨ ফিচারসমূহ
+
+- **Multi-modal:** টেক্সট ও ছবি দুটোই প্রসেস করতে পারে
+- **Dual Provider:** Google Gemini এবং OpenRouter — যেকোনো একটি বেছে নেওয়া যায়
+- **Smart Image Handling:** ছবি পাঠালে DB-তে রাখা হয়, পরের মেসেজের সাথে পাঠানো হয়
+- **Long-term Memory:** MongoDB-তে conversation history সংরক্ষিত থাকে
+- **Auto-Fallback:** মেইন মডেল ব্যর্থ হলে স্বয়ংক্রিয়ভাবে ব্যাকআপে চলে যায়
+- **Security:** শুধুমাত্র Admin-এর মেসেজে রেসপন্স করে
 
 ---
 
-## 🚀 স্টেপ-বাই-স্টেপ সেটআপ গাইড
+## 🗂️ ফাইল স্ট্রাকচার
 
-### ধাপ ১: প্রজেক্ট ক্লোন এবং ইনস্টল করা
-প্রথমে রিপোজিটরিটি আপনার লোকাল মেশিনে (বা Termux-এ) ক্লোন করে ডিপেন্ডেন্সিগুলো ইনস্টল করুন:
+```
+messenger-ai-bot/
+├── server.js        # Express server, webhook handler, command routing
+├── ai.js            # Provider router — Google/OpenRouter সিলেক্ট করে
+├── gemini.js        # Google Gemini API integration
+├── openrouter.js    # OpenRouter API integration
+├── database.js      # MongoDB — chat history, pending images, settings
+├── utils.js         # ছবি URL → Base64 converter
+├── messenger.js     # Facebook Send API wrapper
+├── setup-menu.js    # Messenger Persistent Menu সেটআপ (একবার চালাতে হয়)
+├── .env             # API keys (গিটহাবে দেবে না!)
+├── .gitignore
+└── package.json
+```
+
+---
+
+## 🛠️ যা যা লাগবে
+
+| টুল / সার্ভিস | কাজ | লিংক |
+|---|---|---|
+| Node.js ≥ 18 | Runtime | [nodejs.org](https://nodejs.org) |
+| Google AI Studio | Gemini API Key | [aistudio.google.com](https://aistudio.google.com) |
+| OpenRouter | OpenRouter API Key | [openrouter.ai](https://openrouter.ai) |
+| MongoDB Atlas | ডাটাবেস | [mongodb.com/atlas](https://mongodb.com/atlas) |
+| Facebook Developer | Page + Webhook | [developers.facebook.com](https://developers.facebook.com) |
+| Render / Koyeb | Hosting | [render.com](https://render.com) |
+
+---
+
+## 🚀 সেটআপ গাইড
+
+### ধাপ ১: ক্লোন ও ইনস্টল
+
 ```bash
 git clone https://github.com/SIFAT-AL-MUKIT/messenger-ai-bot.git
 cd messenger-ai-bot
 npm install
 ```
 
-### ধাপ ২: Environment Variables (.env) সেটআপ
-প্রজেক্ট ফোল্ডারে `.env` নামে একটি ফাইল তৈরি করুন এবং নিচের কোডগুলো বসিয়ে দিন:
+### ধাপ ২: Environment Variables
+
+প্রজেক্ট ফোল্ডারে `.env` ফাইল তৈরি করুন:
+
 ```env
 PORT=3000
-VERIFY_TOKEN=আপনার_ইচ্ছামতো_যেকোনো_পাসওয়ার্ড_দিন
-PAGE_ACCESS_TOKEN=ফেসবুক_ডেভেলপার_পোর্টাল_থেকে_পাওয়া_টোকেন
+VERIFY_TOKEN=আপনার_পছন্দমতো_যেকোনো_পাসওয়ার্ড
+PAGE_ACCESS_TOKEN=ফেসবুক_ডেভেলপার_পোর্টাল_থেকে
 ADMIN_SENDER_ID=আপাতত_ফাঁকা_রাখুন
-OPENROUTER_API_KEY=ওপেনরাউটার_থেকে_পাওয়া_কী
-MONGODB_URI=মঙ্গোডিবি_লিংক_এখানে_বসবে
+GEMINI_API_KEY=গুগল_এআই_স্টুডিও_থেকে
+OPENROUTER_API_KEY=ওপেনরাউটার_থেকে
+MONGODB_URI=মঙ্গোডিবি_অ্যাটলাস_লিংক
+RENDER_URL=আপনার_রেন্ডার_সার্ভিসের_URL (deploy করার পর দিন)
 ```
-*(**নোট:** MongoDB লিংকের ভেতরে `<password>` লেখাটি মুছে আপনার তৈরি করা ডাটাবেস পাসওয়ার্ডটি বসাতে ভুলবেন না)।*
 
-### ধাপ ৩: লোকাল টানেলিং (Local Tunneling)
-লোকাল মেশিনে বট টেস্ট করার জন্য সার্ভারটি চালু করুন:
+> **নোট:** `MONGODB_URI`-এর ভেতরে `<password>` জায়গায় আসল পাসওয়ার্ড বসান।
+
+### ধাপ ৩: লোকাল টানেলিং
+
+সার্ভার চালু করুন:
 ```bash
 node server.js
 ```
-এবার এই লোকাল সার্ভারটিকে ইন্টারনেটে লাইভ করার জন্য আরেকটি টার্মিনাল সেশন ওপেন করে নিচের যেকোনো একটি কমান্ড দিন (বিশেষ করে Android/Termux ইউজারদের জন্য Localtunnel অনেক সময় এরর দেয়, তাই নিচের বিকল্পগুলো ব্যবহার করা উত্তম):
 
-**বিকল্প ১ (Cloudflare Tunnel - Best):**
+আরেকটি টার্মিনালে টানেল তৈরি করুন:
+
 ```bash
+# Cloudflare (Cloudflare দিয়ে কাজ নাও করতে পারে!)
 cloudflared tunnel --url http://127.0.0.1:3000
-```
-**বিকল্প ২ (SSH Tunnel - No install required):**
-```bash
+
+# অথবা SSH (SSH দিয়ে অবশ্যই কাজ করবে)
 ssh -R 80:localhost:3000 nokey@localhost.run
 ```
-কমান্ডটি রান হওয়ার পর আপনি একটি `https://...` লিংক পাবেন। লিংকটি কপি করে রাখুন।
+
+একটি `https://...` লিংক পাবেন — কপি করে রাখুন।
 
 ### ধাপ ৪: Facebook Webhook সেটআপ
-1. Facebook Developer পোর্টালে যান -> **Messenger > Settings**।
-2. **Webhooks** সেকশনে **"Add Callback URL"** এ ক্লিক করুন।
-3. আপনার কপি করা টানেল লিংকটি পেস্ট করুন এবং শেষে অবশ্যই **`/webhook`** যুক্ত করুন। (যেমন: `https://your-link.lhr.life/webhook`)
-4. Verify Token এর ঘরে `.env` ফাইলে দেওয়া পাসওয়ার্ডটি বসিয়ে Verify করুন।
-5. **সবচেয়ে গুরুত্বপূর্ণ:** Webhooks সেকশনের নিচে **"Select a Page"** থেকে আপনার কাঙ্ক্ষিত ফেসবুক পেজটি সিলেক্ট করে **"Subscribe"** বাটনে ক্লিক করুন। (এটি না করলে মেসেজ সার্ভারে আসবে না!)
+
+1. [developers.facebook.com](https://developers.facebook.com) → আপনার App → **Messenger > Settings**
+2. **Webhooks** → **Add Callback URL**
+3. URL: `https://your-tunnel-link/webhook`
+4. Verify Token: `.env`-এর `VERIFY_TOKEN`-এর মান
+5. **"Attach a client certificate..."** অপশনটি **Off** রাখুন
+6. Verify হলে **Select a Page** → আপনার পেজ → **Subscribe**
+7. `messages` এবং `messaging_postbacks` — দুটোই subscribe করুন
 
 ### ধাপ ৫: ADMIN_SENDER_ID বের করা
-ফেসবুক মেসেঞ্জারে আপনার পেজটি ওপেন করে একটি মেসেজ দিন (যেমন: "Hello")।
-সাথে সাথে আপনার টার্মিনালে তাকালে দেখবেন এমন একটি লগ এসেছে:
-`📩 New message received from PSID: 123456789012345`
 
-এই বড় সংখ্যাটি কপি করে আপনার `.env` ফাইলের `ADMIN_SENDER_ID=` এর ঘরে বসিয়ে দিন এবং সার্ভার রিস্টার্ট করুন। এখন থেকে বটটি শুধু আপনার জন্যই কাজ করবে!
+Messenger-এ পেজে একটি মেসেজ পাঠান। টার্মিনালে এই লগ দেখবেন:
 
----
+```
+📩 New message received from PSID: 123456789012345
+```
 
-## 🌐 ইন্টারনেটে লাইভ করা (Deployment on Render)
+এই সংখ্যাটি `.env`-এর `ADMIN_SENDER_ID`-তে বসান এবং সার্ভার রিস্টার্ট করুন।
 
-আপনার বট লোকাল মেশিনে ঠিকমতো কাজ করলে এবার এটিকে গিটহাবে পুশ করুন এবং Render-এ লাইভ করুন:
-1. Render.com এ গিয়ে **"New Web Service"** তৈরি করুন।
-2. আপনার গিটহাব রিপোজিটরিটি কানেক্ট করুন।
-3. **Build Command:** `npm install`
-4. **Start Command:** `node server.js`
-5. **Environment Variables** অপশনে গিয়ে আপনার `.env` ফাইলের সব ডাটা একে একে বসিয়ে দিন।
-6. **Deploy** বাটনে ক্লিক করুন। 
+### ধাপ ৬: Persistent Menu সেটআপ (একবার)
 
-Render আপনাকে একটি স্থায়ী URL দেবে। Facebook Developer পোর্টালে গিয়ে Webhook এর ওই লোকাল লিংকের জায়গায় Render-এর নতুন লিংকটি (শেষে `/webhook` সহ) বসিয়ে দিন। **আপনার বট এখন ২৪/৭ অনলাইনে প্রস্তুত!**
+```bash
+node setup-menu.js
+```
 
 ---
 
-## ⚠️ সাধারণ সমস্যা ও সমাধান (Troubleshooting)
+## 🌐 Render-এ Deploy করা
 
-বাস্তব অভিজ্ঞতার আলোকে এই প্রজেক্টটি সেটআপ করার সময় যেসব এরর আসতে পারে এবং তার সমাধান নিচে দেওয়া হলো:
-
-### ১. MongoDB Connection Error (`querySrv ETIMEOUT` বা `buffering timed out`)
-* **কারণ:** Render-এর সার্ভারগুলো রিস্টার্ট হলে এদের IP Address পরিবর্তন হয়ে যায়। ফলে MongoDB সিকিউরিটির কারণে কানেকশন ব্লক করে দেয়। Termux-এও DNS বাগ এর কারণে এই সমস্যা হতে পারে।
-* **সমাধান:** MongoDB Atlas-এর ড্যাশবোর্ডে লগিন করুন। বামপাশের মেনু থেকে **"Network Access"** এ গিয়ে **"+ ADD IP ADDRESS"** এ ক্লিক করুন এবং **"ALLOW ACCESS FROM ANYWHERE"** (`0.0.0.0/0`) সিলেক্ট করে সেভ করুন। 
-
-### ২. Webhook ভেরিফাই হচ্ছে না (URL couldn't be validated)
-* **কারণ:** লিংকের শেষে `/webhook` না দেওয়া অথবা ফেসবুকের রিকোয়েস্ট লোকাল সার্ভারে পৌঁছাতে না পারা।
-* **সমাধান:** 
-  - লিংকের শেষে `/webhook` আছে কি না নিশ্চিত হোন।
-  - Webhook সেটআপ করার পপ-আপ বক্সে **"Attach a client certificate..."** অপশনটি অবশ্যই **Off/Disable** করে রাখবেন।
-  - Termux ইউজার হলে `localhost` এর বদলে `127.0.0.1` দিয়ে টানেল তৈরি করুন।
-
-### ৩. Termux-এ Localtunnel এরর (`Unsupported platform: android`)
-* **কারণ:** Localtunnel-এর ভেতরের একটি প্যাকেজ পিসি ছাড়া অ্যান্ড্রয়েডে কাজ করে না।
-* **সমাধান:** Localtunnel ব্যবহার না করে Cloudflare (`cloudflared`) অথবা সরাসরি SSH (`ssh -R 80:localhost:3000 nokey@localhost.run`) ব্যবহার করুন।
-
-### ৪. মেসেঞ্জারে মেসেজ দিলে কোনো রেসপন্স বা লগ আসছে না
-* **কারণ:** Webhook ভেরিফাই হলেও পেজটিকে সাবস্ক্রাইব করা হয়নি অথবা আপনি অন্য কোনো ফেইক আইডি দিয়ে মেসেজ দিচ্ছেন।
-* **সমাধান:** Developer পোর্টালে Webhooks সেকশনে গিয়ে ড্রপডাউন থেকে আপনার পেজটি সিলেক্ট করে **"Subscribe"** এ ক্লিক করুন। `messages` এবং `messaging_postbacks` এই দুটি অবশ্যই সাবস্ক্রাইব করা থাকতে হবে। অ্যাপটি "Development Mode"-এ থাকলে শুধুমাত্র আপনার ডেভেলপার আইডি থেকেই মেসেজ দিন।
-
-### ৫. OpenRouter Rate Limit সার্ভার
-* **কারণ:** ফ্রি মডেলগুলোতে অনেসময় সার্ভার ওভারলোড থাকে। 
-* **সমাধান:** আপনাকে কিছুই করতে হবে না! এই প্রজেক্টের কোডে ফলব্যাক (Fallback) লজিক লেখা আছে। মেইন মডেল এরর দিলে বট সাথে সাথে মেসেঞ্জারে আপনাকে জানাবে এবং ব্যাকআপ মডেল দিয়ে নিজে নিজেই উত্তর বের করে আনবে।
+1. [render.com](https://render.com) → **New Web Service**
+2. GitHub রিপো কানেক্ট করুন
+3. Build Command: `npm install`
+4. Start Command: `node server.js`
+5. **Environment Variables**-এ `.env`-এর সব ভ্যালু যোগ করুন
+6. Deploy হলে Render-এর URL টি `.env`-এর `RENDER_URL`-এ বসান এবং redeploy করুন
+7. Facebook Developer পোর্টালে Webhook URL টি Render-এর URL দিয়ে আপডেট করুন
 
 ---
-**Enjoy your personal AI Assistant! 🚀**
+
+## 💬 কমান্ড রেফারেন্স
+
+| কমান্ড | কাজ |
+|---|---|
+| `/help` | বাটন মেনু দেখায় |
+| `/model` | মডেল পরিবর্তন করুন |
+| `/status` | বর্তমান provider, model, memory দেখায় |
+| `/clear` | সব চ্যাট হিস্ট্রি ও pending ছবি মুছে দেয় |
+
+---
+
+## 🤖 মডেল লিস্ট
+
+### Google Gemini (ডিফল্ট)
+| মডেল | বৈশিষ্ট্য |
+|---|---|
+| `gemini-2.5-flash` | **ডিফল্ট।** দ্রুত ও স্মার্ট, ছবি সাপোর্ট |
+| `gemini-3-flash-preview` | নতুন, উন্নত — OpenRouter image bridge হিসেবেও ব্যবহার হয় |
+| `gemini-3.1-flash-lite-preview` | হালকা ও দ্রুততম |
+| `gemma-4-31b-it` | Open-weight মডেল |
+
+### OpenRouter
+| মডেল | বৈশিষ্ট্য |
+|---|---|
+| `openrouter/auto` | **ডিফল্ট।** OR নিজেই সেরা মডেল বেছে নেয় |
+| `qwen/qwen3-plus:free` | শক্তিশালী reasoning |
+| `stepfun/step-3.5-flash:free` | দ্রুত |
+
+> কাস্টম মডেলও ব্যবহার করা যাবে — `/model` কমান্ডে model name টাইপ করুন।
+
+---
+
+## 📷 ছবি পাঠানোর নিয়ম
+
+Messenger-এ একসাথে ছবি ও টেক্সট পাঠানো যায় না। তাই:
+
+1. আগে ছবিটি পাঠান → বট confirm করবে: `"📷 ছবি পেয়েছি! এখন কোনো প্রশ্ন করুন।"`
+2. এরপর প্রশ্ন বা মেসেজ পাঠান → ছবি + মেসেজ একসাথে AI-তে যাবে
+
+**Google Provider:** প্রতিটি মেসেজে ছবি পাঠানো থাকে যতক্ষণ `/clear` না দেওয়া হয়।
+
+**OpenRouter Provider:** ছবি একবারের জন্য `gemini-3-flash-preview` দিয়ে প্রসেস হয়, তারপর স্বয়ংক্রিয়ভাবে সরিয়ে দেওয়া হয়।
+
+---
+
+## ⚠️ সাধারণ সমস্যা ও সমাধান
+
+### MongoDB Connection Error
+**কারণ:** Render-এর IP পরিবর্তন হলে MongoDB block করে।
+
+**সমাধান:** MongoDB Atlas → **Network Access** → **Add IP Address** → **Allow Access From Anywhere** (`0.0.0.0/0`)
+
+### Webhook ভেরিফাই হচ্ছে না
+- URL-এর শেষে `/webhook` আছে কিনা নিশ্চিত করুন
+- **"Attach a client certificate..."** অবশ্যই **Off** রাখুন
+- Termux-এ `localhost`-এর বদলে `127.0.0.1` ব্যবহার করুন
+
+### Termux-এ Localtunnel কাজ করে না
+Cloudflare বা SSH tunnel ব্যবহার করুন (ধাপ ৩ দেখুন)।
+
+### মেসেজ দিলে কোনো রেসপন্স নেই
+- Webhook-এ পেজটি Subscribe করা আছে কিনা দেখুন
+- App যদি Development Mode-এ থাকে, শুধু আপনার developer account থেকে মেসেজ দিন
+- `ADMIN_SENDER_ID` সঠিক আছে কিনা চেক করুন
+
+### OpenRouter Rate Limit
+কোনো কিছু করতে হবে না — auto-fallback সিস্টেম Google-এ চলে যাবে এবং মেসেঞ্জারে জানিয়ে দেবে।
+
+---
+
+## 🔑 `.env` পূর্ণ টেমপ্লেট
+
+```env
+PORT=3000
+VERIFY_TOKEN=
+PAGE_ACCESS_TOKEN=
+ADMIN_SENDER_ID=
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+MONGODB_URI=
+RENDER_URL=
+```

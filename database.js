@@ -187,6 +187,25 @@ async function setUserModel(senderId, model) {
     }
 }
 
+// ─── Atomic Provider + Model Update ───
+// setProvider + setUserModel একসাথে, একটি DB call-এ।
+// Error re-throw করে — caller try-catch দিয়ে জানতে পারবে সেভ হয়েছে কিনা।
+
+async function setProviderAndModel(senderId, provider, model) {
+    if (!isConnected) throw new Error('DB সংযুক্ত নেই');
+    try {
+        await Chat.findOneAndUpdate(
+            { senderId },
+            { $set: { preferredProvider: provider, preferredModel: model } },
+            { upsert: true }
+        );
+        console.log(`✅ Provider+Model saved: ${provider} / ${model}`);
+    } catch (err) {
+        console.error('❌ setProviderAndModel:', err.message);
+        throw err;  // re-throw — server.js-এ try-catch এটা ধরবে
+    }
+}
+
 module.exports = {
     connectDB,
     getChatHistory,
@@ -198,5 +217,6 @@ module.exports = {
     getProvider,
     setProvider,
     getUserModel,
-    setUserModel
+    setUserModel,
+    setProviderAndModel,  // নতুন
 };

@@ -42,6 +42,13 @@ const OPENROUTER_MODELS = [
 
 const ALL_MODELS = [...GOOGLE_MODELS, ...OPENROUTER_MODELS];
 
+// ai.js-এর DEFAULTS-এর সাথে sync রাখতে হবে।
+// Status display-এর জন্য — কোনো custom model সেট না থাকলে actual default দেখাবে।
+const MODEL_DEFAULTS = {
+    google: 'gemini-2.5-flash',
+    openrouter: 'openrouter/auto'
+};
+
 // Health Check
 app.get('/', (req, res) => {
     res.status(200).json({ status: 'alive', uptime: Math.floor(process.uptime()) + 's' });
@@ -213,13 +220,20 @@ async function handlePostback(senderId, postback) {
         const provider = rest.substring(0, colonIdx);
         const model    = rest.substring(colonIdx + 1);
 
-        await db.setProvider(senderId, provider);
-        await db.setUserModel(senderId, model);
-
-        const providerEmoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
-        await messenger.sendTextMessage(senderId,
-            `✅ পরিবর্তন সম্পন্ন!\n\n• Provider: ${providerEmoji}\n• Model: ${model}`
-        );
+        // ✅ FIX: একটাই atomic DB call — দুটো আলাদা call ছিল আগে।
+        // DB সেভ verify করার পরেই confirmation পাঠানো হচ্ছে।
+        try {
+            await db.setProviderAndModel(senderId, provider, model);
+            const providerEmoji = provider === 'google' ? '🟢 Google' : '🟠 OpenRouter';
+            await messenger.sendTextMessage(senderId,
+                `✅ পরিবর্তন সম্পন্ন!\n\n• Provider: ${providerEmoji}\n• Model: ${model}`
+            );
+        } catch (err) {
+            console.error('❌ Model update failed:', err.message);
+            await messenger.sendTextMessage(senderId,
+                '❌ মডেল পরিবর্তন ব্যর্থ হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।'
+            );
+        }
         return;
     }
 
@@ -243,10 +257,15 @@ async function handlePostback(senderId, postback) {
             const imgs = await db.getPendingImages(senderId);
             const provEmoji = prov === 'google' ? '🟢 Google' : '🟠 OpenRouter';
 
+            // ✅ FIX: mod null হলে "Default" না দেখিয়ে actual model name দেখাও।
+            // ai.js-এর DEFAULTS-এর সাথে consistent।
+            const effectiveModel = mod || MODEL_DEFAULTS[prov] || MODEL_DEFAULTS.google;
+            const modelLabel = mod ? effectiveModel : `${effectiveModel} (default)`;
+
             await messenger.sendTextMessage(senderId,
                 `📊 বট স্ট্যাটাস\n\n` +
                 `• Provider: ${provEmoji}\n` +
-                `• Model: ${mod || 'Default'}\n` +
+                `• Model: ${modelLabel}\n` +
                 `• মেমরি: ${hist.length}টি মেসেজ\n` +
                 `• Pending ছবি: ${imgs.length}টি\n` +
                 `• আপটাইম: ${Math.floor(process.uptime())}s`

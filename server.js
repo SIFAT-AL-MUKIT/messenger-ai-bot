@@ -30,6 +30,7 @@ if (process.env.RENDER_URL) {
 const GOOGLE_MODELS = [
     { title: '⚡ Gemini 2.5 Flash',       payload: 'MODEL_google:gemini-2.5-flash' },
     { title: '🔥 Gemini 3 Flash',         payload: 'MODEL_google:gemini-3-flash-preview' },
+    { title: '🔥 Gemini 3.5 Flash',         payload: 'MODEL_google:gemini-3.5-flash' },
     { title: '💨 Gemini 3.1 Flash Lite',  payload: 'MODEL_google:gemini-3.1-flash-lite-preview' },
     { title: '🟣 Gemma 4 31B',            payload: 'MODEL_google:gemma-4-31b-it' },
 ];
@@ -136,6 +137,19 @@ async function handleMessage(senderId, event) {
         return;
     }
 
+    // "/model google:gemini-3.5-flash" ফরম্যাটে সরাসরি মডেল সেট করা
+    if (command.startsWith('/model ') && command.includes(':')) {
+        const modelStr = userText.trim().substring(7).trim(); // '/model ' বাদ দাও
+        const colonIdx = modelStr.indexOf(':');
+        if (colonIdx > 0) {
+            const provider = modelStr.substring(0, colonIdx).trim();
+            const model    = modelStr.substring(colonIdx + 1).trim();
+            await handlePostback(senderId, { payload: `MODEL_${provider}:${model}` });
+            return;
+        }
+    }
+
+    // শুধু "/model" বা "/models" → মেনু দেখাও
     if (command === '/model' || command === '/models') {
         await handlePostback(senderId, { payload: 'CMD_MODELS' });
         return;
